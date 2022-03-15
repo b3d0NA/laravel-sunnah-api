@@ -2,7 +2,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-
 use Illuminate\Http\Request;
 
 class NotificationController extends Controller
@@ -17,14 +16,26 @@ class NotificationController extends Controller
         $notifications = $request->user()
             ->notifications()
             ->latest()
-            ->cursorPaginate(5);
-        foreach($notifications as $notification){
-            $notification->liked_at = $notification->created_at->diffForHumans();
+            ->cursorPaginate(8);
+        $notifications->markAsRead();
+        foreach ($notifications as $notification) {
+            $notification->actioned_at = $notification->created_at->diffForHumans();
         }
         return response()->json([
             "status" => 200,
             "notifications" => $notifications->items(),
-            "cursor" => $notifications->nextCursor()?->encode()
+            "cursor" => $notifications->nextCursor()?->encode(),
+        ]);
+    }
+
+    public function notificationCount(Request $request)
+    {
+        $notifications = $request->user()
+            ->unreadNotifications()
+            ->count();
+        return response()->json([
+            "status" => 200,
+            "notificationsCount" => $notifications,
         ]);
     }
 

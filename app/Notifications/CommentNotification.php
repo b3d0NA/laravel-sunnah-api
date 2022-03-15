@@ -2,27 +2,26 @@
 
 namespace App\Notifications;
 
-use App\Models\Like;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Notifications\Messages\BroadcastMessage;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class LikedNotification extends Notification implements ShouldBroadcast
+class CommentNotification extends Notification implements ShouldBroadcast
 {
     use Queueable;
 
-    public $like;
+    public $comment;
 
     /**
      * Create a new notification instance.
      *
      * @return void
      */
-    public function __construct(Like $like)
+    public function __construct($comment)
     {
-        $this->like = $like;
+        $this->comment = $comment;
     }
 
     /**
@@ -59,13 +58,14 @@ class LikedNotification extends Notification implements ShouldBroadcast
     public function toArray($notifiable)
     {
         return [
-            "like_id" => $this->like->id,
-            "username" => $this->like->user->username,
-            "user_email" => $this->like->user->email,
-            "user_profile" => $this->like->user->profile,
-            "post_id" => $this->like->post->id,
-            "post_image" => $this->like->post->images->first(),
-            "post_text" => $this->like->post->text,
+            "comment_id" => $this->comment->id,
+            "comment" => $this->comment->text,
+            "username" => $this->comment->user->username,
+            "user_email" => $this->comment->user->email,
+            "user_profile" => $this->comment->user->profile,
+            "post_id" => $this->comment->post->id,
+            "post_image" => $this->comment->post->images->first(),
+            "post_text" => $this->comment->post->text,
         ];
     }
 
@@ -75,6 +75,6 @@ class LikedNotification extends Notification implements ShouldBroadcast
     }
     public function broadcastType()
     {
-        return 'new-like';
+        return 'new-comment';
     }
 }

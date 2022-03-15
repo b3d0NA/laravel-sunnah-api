@@ -11,11 +11,17 @@ use Illuminate\Support\Facades\Storage;
 
 class PostController extends Controller
 {
-    public function index(Request $request){
+    public function __construct()
+    {
+        $this->middleware('auth:sanctum')->except('show');
+    }
+
+    public function index(Request $request)
+    {
         $posts = Post::withCount(["likes", "comments"])
             ->latest()
             ->cursorPaginate(8);
-        foreach($posts as $post){
+        foreach ($posts as $post) {
             $post->posted_user = $post->user->pluck("name")->implode(",");
             $post->user_profile = $post->user->first()->imageUrl();
             $post->posted_at = $post->created_at->diffForHumans();
@@ -25,26 +31,27 @@ class PostController extends Controller
         return response()->json([
             "status" => 200,
             "posts" => $posts->items(),
-            "cursor" => $posts->nextCursor()?->encode()
+            "cursor" => $posts->nextCursor()?->encode(),
         ]);
-    } 
+    }
 
-    public function store(PostRequest $request, Post $post){        
+    public function store(PostRequest $request, Post $post)
+    {
         $post->user_id = $request->user()->id;
-        if($request->filled('text')){
+        if ($request->filled('text')) {
             $post->text = $request->text;
         }
         $post->save();
-        if($request->has("images")){
-            foreach($request->images as $image){
-                $extension = $image->getClientOriginalExtension();                
-                $filename = $image->storeAs("public/posts", $post->id.'_'.time().'.'.$extension);
+        if ($request->has("images")) {
+            foreach ($request->images as $image) {
+                $extension = $image->getClientOriginalExtension();
+                $filename = $image->storeAs("public/posts", $post->id . '_' . time() . '.' . $extension);
                 $imageUrl = url(Storage::url($filename));
-                
+
                 Image::create([
                     "imageable_id" => $post->id,
                     "imageable_type" => Post::class,
-                    "url" => $imageUrl
+                    "url" => $imageUrl,
                 ]);
             }
             $post->images = $post->images()->get()->pluck("url");
@@ -60,40 +67,47 @@ class PostController extends Controller
         ]);
     }
 
-    public function show(Post $post){
-        $post->images = $post->images;
-        $post->posted_user = $post->user;
+    public function show(Post $post, Request $request)
+    {
+        $post->likes_count = $post->likes->count();
+        $post->comments_count = $post->comments->count();
+        $post->posted_user = $post->user->pluck("name")->implode(",");
+        $post->user_profile = $post->user->first()->imageUrl();
+        $post->posted_at = $post->created_at->diffForHumans();
+        $post->liked = $request->user()?->isUserLikedPost($post);
         return response()->json([
             "post" => $post,
         ]);
     }
 
-    public function update(Request $request, Post $post){
+    public function update(Request $request, Post $post)
+    {
         if ($request->user()->cannot('update', $post)) {
             return response()->json([
                 "status" => 403,
-                "message" => "Forbidden! You do not own this post."
+                "message" => "Forbidden! You do not own this post.",
             ], 403);
         }
-        $post =  $post->update([
-            "text" => $request->text
+        $post = $post->update([
+            "text" => $request->text,
         ]);
         return response()->json([
             "status" => 200,
-            "text" => $request->text
+            "text" => $request->text,
         ]);
     }
 
-    public function destroy(Request $request, Post $post){
+    public function destroy(Request $request, Post $post)
+    {
         if ($request->user()->cannot('delete', $post)) {
             return response()->json([
                 "status" => 403,
-                "message" => "Forbidden! You do not own this post."
+                "message" => "Forbidden! You do not own this post.",
             ], 403);
         }
         $post->delete();
         return response()->json([
-            "status" => 200
+            "status" => 200,
         ]);
     }
 }

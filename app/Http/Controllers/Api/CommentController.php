@@ -6,10 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Http\Services\CommentService;
 use App\Models\Comment;
 use App\Models\Post;
+use App\Notifications\CommentNotification;
 use Illuminate\Http\Request;
 
 class CommentController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth:sanctum')->except('index');
+    }
     /**
      * Display a listing of the resource.
      *
@@ -20,7 +25,7 @@ class CommentController extends Controller
         $comments = $post->comments()->with(["user"])
             ->oldest()
             ->cursorPaginate(5);
-        foreach($comments as $comment){
+        foreach ($comments as $comment) {
             $comment->commented_user = $comment->user->name;
             $comment->commented_username = $comment->user->username;
             $comment->user_profile = $comment->user->first()->imageUrl();
@@ -30,7 +35,7 @@ class CommentController extends Controller
         return response()->json([
             "status" => 200,
             "comments" => $comments->items(),
-            "cursor" => $comments->nextCursor()?->encode()
+            "cursor" => $comments->nextCursor()?->encode(),
         ]);
     }
 
@@ -42,6 +47,7 @@ class CommentController extends Controller
      */
     public function store(Request $request, Post $post)
     {
+        $user = $request->user();
         $comment = $post->comments()->create([
             "user_id" => $request->user()->id,
             "text" => $request->comment,
@@ -51,9 +57,10 @@ class CommentController extends Controller
         $comment->user_profile = $comment->user->first()->imageUrl();
         $comment->commented_at = $comment->created_at->diffForHumans();
         $comment->unsetRelation("user");
+        $comment->post->user_id !== $user->id && $comment->post->user()->first()->notify(new CommentNotification($comment));
         return response()->json([
             "status" => 200,
-            "comment" => $comment
+            "comment" => $comment,
         ]);
     }
 
@@ -78,20 +85,20 @@ class CommentController extends Controller
     public function update(Request $request, Comment $comment)
     {
         $request->validate([
-            "text" => "required|min:1"
+            "text" => "required|min:1",
         ]);
         if ($request->user()->cannot('update', $comment)) {
             return response()->json([
                 "status" => 403,
-                "message" => "Forbidden! You do not own this comment."
+                "message" => "Forbidden! You do not own this comment.",
             ], 403);
         }
-        $comment =  $comment->update([
-            "text" => $request->text
+        $comment = $comment->update([
+            "text" => $request->text,
         ]);
         return response()->json([
             "status" => 200,
-            "text" => $request->text
+            "text" => $request->text,
         ]);
     }
 
@@ -106,12 +113,12 @@ class CommentController extends Controller
         if ($request->user()->cannot('delete', $comment)) {
             return response()->json([
                 "status" => 403,
-                "message" => "Forbidden! You do not own this post."
+                "message" => "Forbidden! You do not own this post.",
             ], 403);
         }
         $comment->delete();
         return response()->json([
-            "status" => 200
+            "status" => 200,
         ]);
     }
 }
